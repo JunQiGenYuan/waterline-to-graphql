@@ -2,18 +2,18 @@
 ##Stability status: alpha
 Waterline to graphql adapter.
 This library converts waterline models to graphql types. You can
-execute graphql query which in turns resolves into waterline 
+execute graphql query which in turns resolves into waterline
 queries behind the scenes.   
 
-[![build status](https://img.shields.io/travis/agenthunt/waterline-to-graphql/master.svg?style=flat-square)](https://travis-ci.org/agenthunt/waterline-to-graphql) 
-[![npm version](https://img.shields.io/npm/v/waterline-to-graphql.svg?style=flat-square)](https://www.npmjs.com/package/agenthunt/waterline-to-graphql) 
+[![build status](https://img.shields.io/travis/agenthunt/waterline-to-graphql/master.svg?style=flat-square)](https://travis-ci.org/agenthunt/waterline-to-graphql)
+[![npm version](https://img.shields.io/npm/v/waterline-to-graphql.svg?style=flat-square)](https://www.npmjs.com/package/agenthunt/waterline-to-graphql)
 [![npm downloads](https://img.shields.io/npm/dm/waterline-to-graphql.svg?style=flat-square)](https://www.npmjs.com/package/waterline-to-graphql)
 
 
 ##Basic Usage: (See waterline-example in examples folder)
 
 ```javascript
-import { getGraphQLSchemaFrom } from 'waterline-to-graphql'; 
+import { getGraphQLSchemaFrom } from 'waterline-to-graphql';
 .....
 ```
 
@@ -93,11 +93,11 @@ let UserType = new GraphQLObjectType({
 ```
 
 ##Using with sails,express,relay:
-If  you are using with express/sails , you can define graphql middleware 
-as below. 
+If  you are using with express/sails , you can define graphql middleware
+as below.
 
 * ```npm i waterline-to-graphql```
-* Add the following in config/http.js. 
+* Add the following in config/http.js.
 
 
 ```javascript
@@ -113,6 +113,19 @@ as below.
         return next();
       }
     }
+```
+
+#### Search、Sort、limit、skip feture
+You can search、sort、limit or skip of the model by query arguments like this:
+```
+query someQuery {
+  users(where: { role: 'admin' }, sort: 'createdAt', skip: 10, limit: 10) {
+    account,
+    addresses(where: { country: 'China' }) {
+      country
+    }
+  }
+}
 ```
 
 ####See (react-relay-graphql-sails-example)

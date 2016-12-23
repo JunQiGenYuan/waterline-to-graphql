@@ -1,6 +1,6 @@
 {
   "name": "@simonhg/waterline-to-graphql",
-  "version": "0.0.6",
+  "version": "0.0.8",
   "description": "Waterline to GraphQL adapter",
   "main": "lib/index.js",
   "jsnext:main": "src/index.js",
