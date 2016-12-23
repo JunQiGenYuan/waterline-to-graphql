@@ -20,6 +20,27 @@ function waterlineTypesToGraphQLType(attribute) {
   }
 }
 
+function getFindArgsForWaterlineModel(modelID, GraphQLSchemaManager) {
+  return {
+    where: {
+      name: 'criteria',
+      type: GraphQLSchemaManager.findArgsTypes[modelID]
+    },
+    sort: {
+      name: 'sort',
+      type: GraphQLString
+    },
+    skip: {
+      name: 'skip',
+      type: GraphQLInt
+    },
+    limit: {
+      name: 'limit',
+      type: GraphQLInt
+    }
+  };
+}
+
 function createGraphQLTypeForWaterlineModel(model, modelID, Node, GraphQLSchemaManager) {
   var attributes = model._attributes;
   return new GraphQLObjectType({
@@ -51,20 +72,28 @@ function createGraphQLTypeForWaterlineModel(model, modelID, Node, GraphQLSchemaM
         if(association.model) {
           convertedFields[association.alias] = {
             type: GraphQLSchemaManager.types[association.model],
-            resolve: (obj, /* args */ ) => {
+            description: association.description,
+            resolve: (obj/*, args */ ) => {
               return GraphQLSchemaManager.queries[association.model][association.model].resolve(obj, {
-                id: obj[association.alias].id
+                where: {
+                  id: obj[association.alias].id || obj[association.alias]
+                }
               });
             }
           };
         } else if(association.collection) {
           convertedFields[association.collection + 's'] = {
             type: new GraphQLList(GraphQLSchemaManager.types[association.collection]),
-            resolve: (obj, /* args */ ) => {
-              var searchCriteria = {};
-              searchCriteria[association.via] = obj.id;
-              return GraphQLSchemaManager.queries[association.collection][association.collection + 's'].resolve(
-                obj, searchCriteria);
+            description: association.description,
+            args: getFindArgsForWaterlineModel(association.collection, GraphQLSchemaManager),
+            resolve: (obj, args ) => {
+              var associationCriteria = {};
+              associationCriteria[association.via] = obj.id;
+              // override association's value in where criterial
+              var criteria = Object.assign({}, args, {
+                where: Object.assign({}, args.where, associationCriteria)
+              });
+              return GraphQLSchemaManager.queries[association.collection][association.collection + 's'].resolve(obj, criteria);
             }
           };
         }
@@ -74,7 +103,77 @@ function createGraphQLTypeForWaterlineModel(model, modelID, Node, GraphQLSchemaM
   });
 }
 
-function createGraphQLQueries(waterlineModel, graphqlType, modelID) {
+function createFindArgsTypeForWaterlineModel(model, modelID, Node, GraphQLSchemaManager) {
+  var attributes = model._attributes;
+  return new GraphQLInputObjectType({
+    name: `${modelID}Args`,
+    description: model.description,
+    interfaces: [Node],
+    fields: () => {
+      var convertedFields = {};
+      _.mapKeys(attributes, function(attribute, key) {
+        if(attribute.type) {
+          var field = {
+            type: waterlineTypesToGraphQLType(attribute),
+            description: attribute.description
+          };
+          convertedFields[key] = field;
+        }
+      });
+      var idField = {
+        type: GraphQLString
+      };
+      var typeField = {
+        type: GraphQLString
+      };
+      convertedFields.id = idField;
+      convertedFields.type = typeField;
+
+      var associations = model.associations;
+      // TODO: how to search that records contains someof collection matched
+      associations.forEach((association) => {
+        var field = {
+          type: GraphQLString,
+          description: association.description
+        };
+        convertedFields[association.alias] = field;
+      });
+      // associations.forEach((association) => {
+      //   if(association.model) {
+      //     convertedFields[association.alias] = {
+      //       type: GraphQLSchemaManager.types[association.model],
+      //       description: association.description,
+      //       resolve: (obj, /* args */ ) => {
+      //         return GraphQLSchemaManager.queries[association.model][association.model].resolve(obj, {
+      //           where: {
+      //             id: obj[association.alias].id || obj[association.alias]
+      //           }
+      //         });
+      //       }
+      //     };
+      //   } else if(association.collection) {
+      //     convertedFields[association.collection + 's'] = {
+      //       type: new GraphQLList(GraphQLSchemaManager.types[association.collection]),
+      //       description: association.description,
+      //       args: getFindArgsForWaterlineModel(association.collection, GraphQLSchemaManager),
+      //       resolve: (obj, /* args */ ) => {
+      //         var associationCriteria = {};
+      //         associationCriteria[association.via] = obj.id;
+      //         // override association's value in where criterial
+      //         var criteria = Object.assign({}, args, {
+      //           where: Object.assign({}, args.where, associationCriteria)
+      //         });
+      //         return GraphQLSchemaManager.queries[association.collection][association.collection + 's'].resolve(obj, criteria);
+      //       }
+      //     };
+      //   }
+      // });
+      return convertedFields;
+    }
+  });
+}
+
+function createGraphQLQueries(waterlineModel, graphqlType, modelID, GraphQLSchemaManager) {
   var queries = {};
   // query to get by id
   queries[modelID] = {
@@ -85,21 +184,20 @@ function createGraphQLQueries(waterlineModel, graphqlType, modelID) {
         type: new GraphQLNonNull(GraphQLString)
       }
     },
-    resolve: (obj, {
-      id
-    }) => {
-      return waterlineModel.find({
-        id: id
+    resolve: (obj, {where, id}) => {
+      return waterlineModel.findOne({
+        id: id || (where && where.id)
       }).then(function(result) {
-        return result[0];
+        return result;
       });
     }
   };
   // query to find based on search criteria
   queries[modelID + 's'] = {
     type: new GraphQLList(graphqlType),
+    args: getFindArgsForWaterlineModel(modelID, GraphQLSchemaManager),
     resolve: (obj, criteria) => {
-      return waterlineModel.find(criteria).populateAll().then(function(results) {
+      return waterlineModel.find(criteria).then(function(results) {
         return results;
       });
     }
@@ -161,24 +259,26 @@ function createGraphQLMutations(waterlineModel, graphqlType, modelID, GraphQLSch
     }
   });*/
 
+  const wrapResolve = resolve => (obj, args) => resolve(args);
+
   mutations['create' + capitalizeFirstLetter(modelID)] = {
     type: graphqlType,
     args: convertedFields,
-    resolve: waterlineModel.create,
+    resolve: wrapResolve(waterlineModel.create),
     name: 'create' + modelID
   };
 
   mutations['update' + capitalizeFirstLetter(modelID)] = {
     type: graphqlType,
     args: convertedFields,
-    resolve: waterlineModel.update,
+    resolve: wrapResolve(waterlineModel.update),
     name: 'update' + modelID
   };
 
   mutations['delete' + capitalizeFirstLetter(modelID)] = {
     type: graphqlType,
     args: convertedFields,
-    resolve: waterlineModel.delete,
+    resolve: wrapResolve(waterlineModel.delete),
     name: 'delete' + modelID
   };
 
@@ -192,6 +292,7 @@ export default function getGraphQLSchemaFrom(models) {
 
   var GraphQLSchemaManager = {
     types: {},
+    findArgsTypes: {},
     queries: {},
     connectionTypes: {},
     mutations: {},
@@ -255,8 +356,9 @@ export default function getGraphQLSchemaFrom(models) {
   _.each(models, function eachInstantiatedModel(thisModel, modelID) {
     GraphQLSchemaManager.types[modelID] = createGraphQLTypeForWaterlineModel(thisModel, modelID, Node,
       GraphQLSchemaManager);
+    GraphQLSchemaManager.findArgsTypes[modelID] = createFindArgsTypeForWaterlineModel(thisModel, modelID, Node, GraphQLSchemaManager);
     GraphQLSchemaManager.queries[modelID] = createGraphQLQueries(thisModel, GraphQLSchemaManager.types[modelID],
-      modelID);
+      modelID, GraphQLSchemaManager);
   });
 
 

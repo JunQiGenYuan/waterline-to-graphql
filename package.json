@@ -1,6 +1,6 @@
 {
-  "name": "waterline-to-graphql",
-  "version": "0.0.2",
+  "name": "@simonhg/waterline-to-graphql",
+  "version": "0.0.6",
   "description": "Waterline to GraphQL adapter",
   "main": "lib/index.js",
   "jsnext:main": "src/index.js",
@@ -27,7 +27,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/agenthunt/waterline-to-graphql.git"
+    "url": "https://github.com/JunQiGenYuan/waterline-to-graphql.git"
   },
   "keywords": [
     "waterline",
@@ -35,15 +35,15 @@
     "sailsjs",
     "adapter"
   ],
-  "author": "Shailesh",
+  "author": "simonhg",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/agenthunt/waterline-to-graphql/issues"
+    "url": "https://github.com/JunQiGenYuan/waterline-to-graphql/issues"
   },
   "dependencies": {
     "lodash": "3.10.1"
   },
-  "homepage": "https://github.com/agenthunt/waterline-to-graphql",
+  "homepage": "https://github.com/JunQiGenYuan/waterline-to-graphql",
   "devDependencies": {
     "babel": "^5.5.8",
     "babel-core": "^5.6.18",
